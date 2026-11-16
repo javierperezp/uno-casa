@@ -127,19 +127,47 @@ html{scroll-behavior:smooth;scroll-padding-top:12px}
 .trip{gap:2px!important}
 
 
-/* V24: master size aligned to exactly two painting blocks; controls stay at top */
+/* V25: EXACT 2x triptych scale. No stretching or arbitrary height overrides. */
+.layout,body.compact-gallery .layout{
+  display:grid!important;
+  grid-template-columns:minmax(0,2fr) minmax(0,6fr)!important;
+  gap:10px!important;
+  align-items:start;
+}
 #your-creation .controls{margin:10px 0 12px}
-#your-creation .master{width:100%;max-width:100%!important;margin:0 auto}
-#your-creation .master .trip{height:var(--master-trip-height,auto)}
-#your-creation .master .part{aspect-ratio:auto!important;flex:1 1 0%;min-height:0}
+#your-creation .master,body.compact-gallery #your-creation .master{
+  width:var(--master-exact-width,100%)!important;
+  max-width:100%!important;
+  margin:0 auto;
+}
+#your-creation .master .trip{
+  display:flex;
+  flex-direction:column;
+  gap:var(--master-part-gap,4px)!important;
+  height:auto!important;
+  width:100%;
+}
+#your-creation .master .part,body.compact-gallery #your-creation .master .part{
+  aspect-ratio:.77!important;
+  flex:none!important;
+  height:auto!important;
+  min-height:0;
+}
 #your-creation .note{margin-top:10px}
-@media(min-width:701px){
-  #your-creation{display:flex;flex-direction:column}
-  #your-creation .master{max-width:100%!important}
+@media(max-width:1100px){
+  .layout,body.compact-gallery .layout{
+    display:flex!important;
+    flex-direction:column!important;
+    grid-template-columns:none!important;
+  }
+  .layout>.panel{width:100%;min-width:0}
+  #your-creation .master,body.compact-gallery #your-creation .master{
+    width:min(100%,var(--master-exact-width,420px))!important;
+    max-width:100%!important;
+  }
 }
 @media(max-width:700px){
   #your-creation .controls{order:0}
-  #your-creation .master{width:min(100%,420px)!important;max-width:420px!important}
 }
 </style></head><body><main class="wrap"><header><div><h1>UN<b>O</b></h1><p>CASA · Chile Australia Association</p></div><div class="count">12 artists · 36 artwork sections</div><div aria-label="Artwork size controls" class="zoom-controls">
 <button aria-label="Zoom out" data-action="zoom-out" type="button">−</button>
@@ -262,27 +290,34 @@ document.getElementById('dialog').addEventListener('click',function(e){if(e.targ
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closePicker();});
 setZoom(zoom);renderGallery();renderMaster();
 })();</script><script>
+/* Keep Your Creation exactly 2x the width and height of a gallery triptych.
+   The three sections retain the identical per-section aspect ratio. */
 (function(){
-  function syncMasterHeight(){
-    var root = document.documentElement;
-    var gallery = document.getElementById('gallery');
-    var masterTrip = document.querySelector('#your-creation .master .trip');
-    var firstTrip = document.querySelector('#gallery .artist .trip');
-    if(!gallery || !masterTrip || !firstTrip) return;
-    var tripRect = firstTrip.getBoundingClientRect();
-    if(!tripRect.height) return;
-    var gap = parseFloat(getComputedStyle(gallery).rowGap || getComputedStyle(gallery).gap || '0') || 0;
-    var target = Math.round(tripRect.height * 2 + gap);
-    root.style.setProperty('--master-trip-height', target + 'px');
+  var gallery=document.getElementById('gallery');
+  var sample=document.querySelector('#gallery .artist .trip');
+  var master=document.querySelector('#your-creation .master');
+  var masterTrip=master&&master.querySelector('.trip');
+  if(!gallery||!sample||!masterTrip)return;
+  function sync(){
+    var sampleWidth=sample.getBoundingClientRect().width;
+    if(!sampleWidth)return;
+    var wrapper=document.querySelector('#your-creation');
+    var wrapperStyle=getComputedStyle(wrapper);
+    var available=wrapper.clientWidth-parseFloat(wrapperStyle.paddingLeft)-parseFloat(wrapperStyle.paddingRight);
+    var width=Math.min(sampleWidth*2,Math.max(0,available));
+    /* Resize in CSS/layout pixels; zoom transforms affect both sides equally. */
+    var sampleRaw=sample.offsetWidth;
+    if(sampleRaw>0)width=Math.min(sampleRaw*2,Math.max(0,available));
+    master.style.setProperty('--master-exact-width',width+'px');
+    var gap=parseFloat(getComputedStyle(sample).gap)||2;
+    masterTrip.style.setProperty('--master-part-gap',(gap*2)+'px');
   }
-  function rafSync(){ window.requestAnimationFrame(syncMasterHeight); }
-  window.addEventListener('load', rafSync);
-  window.addEventListener('resize', rafSync);
-  document.addEventListener('click', function(e){
-    var t = e.target.closest('[data-action],[data-part]');
-    if(t) setTimeout(syncMasterHeight, 30);
-  });
-  setTimeout(syncMasterHeight, 120);
-  setTimeout(syncMasterHeight, 400);
+  var scheduled=false;
+  function requestSync(){if(scheduled)return;scheduled=true;requestAnimationFrame(function(){scheduled=false;sync();});}
+  window.addEventListener('load',requestSync);
+  window.addEventListener('resize',requestSync);
+  if(window.ResizeObserver){var observer=new ResizeObserver(requestSync);observer.observe(sample);observer.observe(gallery);}
+  document.addEventListener('click',function(e){if(e.target.closest('[data-action]'))requestSync();});
+  requestSync();
 })();
 </script></body></html>
